@@ -344,84 +344,59 @@ def _run_agent(message: str) -> tuple[str, str | None]:
 # ---------------------------------------------------------------------------
 # Vercel handler
 # ---------------------------------------------------------------------------
-class handler(BaseHTTPRequestHandler):
+def handler(request):
+    cors_headers = {
+        "Access-Control-Allow-Origin":  "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+    }
 
-    def _cors_headers(self) -> dict:
-        origin = os.environ.get("ALLOWED_ORIGIN", "*")
-        return {
-            "Access-Control-Allow-Origin":  origin,
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
-        }
+    # Serve the HTML page on GET
+    if request.method == "GET":
+        import pathlib
+        html_path = pathlib.Path(__file__).parent.parent / "public" / "index.html"
+        html = html_path.read_text(encoding="utf-8")
+        return (html, 200, {"Content-Type": "text/html; charset=utf-8"})
 
-    def _send_json(self, status: int, body: dict):
-        encoded = json.dumps(body).encode()
-        self.send_response(status)
-        for k, v in self._cors_headers().items():
-            self.send_header(k, v)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(encoded)))
-        self.end_headers()
-        self.wfile.write(encoded)
+    if request.method == "OPTIONS":
+        return ("", 204, cors_headers)
 
-    def do_OPTIONS(self):
-        self.send_response(204)
-        for k, v in self._cors_headers().items():
-            self.send_header(k, v)
-        self.end_headers()
+    # POST — run the agent
+    cors_headers["Content-Type"] = "application/json"
 
-    def do_POST(self):
-        # Read body
-        length = int(self.headers.get("Content-Length", 0))
-        raw    = self.rfile.read(length)
+    try:
+        body = request.json if hasattr(request, "json") else json.loads(request.body)
+        if callable(body):
+            body = body()
+    except Exception:
+        return (json.dumps({"error": "Invalid JSON."}), 400, cors_headers)
 
-        try:
-            body = json.loads(raw)
-        except json.JSONDecodeError:
-            self._send_json(400, {"error": "Invalid JSON."})
-            return
+    try:
+        message, session_id = _validate_input(body)
+    except ValueError as e:
+        return (json.dumps({"error": str(e)}), 400, cors_headers)
 
-        # Validate input
-        try:
-            message, session_id = _validate_input(body)
-        except ValueError as e:
-            self._send_json(400, {"error": str(e)})
-            return
+    client_ip = (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or "unknown"
+    )
+    allowed, remaining = _check_rate_limit(client_ip)
+    if not allowed:
+        return (json.dumps({
+            "error": f"Rate limit exceeded. {MAX_REQUESTS_PER_DAY} messages per day.",
+            "retry_after": "tomorrow",
+        }), 429, cors_headers)
 
-        # Rate limit
-        client_ip = (
-            self.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-            or self.headers.get("X-Real-IP", "")
-            or "unknown"
-        )
-        allowed, remaining = _check_rate_limit(client_ip)
-        if not allowed:
-            self._send_json(429, {
-                "error": f"Rate limit exceeded. You may send {MAX_REQUESTS_PER_DAY} messages per day.",
-                "retry_after": "tomorrow",
-            })
-            return
+    if not ANTHROPIC_API_KEY:
+        return (json.dumps({"error": "Service not configured."}), 503, cors_headers)
 
-        # Check config
-        if not ANTHROPIC_API_KEY:
-            self._send_json(503, {"error": "Service not configured."})
-            return
+    try:
+        response_text, notion_url = _run_agent(message)
+    except Exception:
+        return (json.dumps({"error": "Internal server error."}), 500, cors_headers)
 
-        # Run agent
-        try:
-            response_text, notion_url = _run_agent(message)
-        except httpx.HTTPStatusError as e:
-            self._send_json(502, {"error": "Upstream API error. Please try again."})
-            return
-        except Exception:
-            self._send_json(500, {"error": "Internal server error."})
-            return
-
-        self._send_json(200, {
-            "response":   response_text,
-            "notion_url": notion_url,
-            "remaining":  remaining,
-        })
-
-    def log_message(self, fmt, *args):
-        pass  # Suppress default HTTP logging; Vercel captures stdout separately
+    return (json.dumps({
+        "response":   response_text,
+        "notion_url": notion_url,
+        "remaining":  remaining,
+    }), 200, cors_headers)
