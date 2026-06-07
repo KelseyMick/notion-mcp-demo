@@ -342,61 +342,53 @@ def _run_agent(message: str) -> tuple[str, str | None]:
 
 
 # ---------------------------------------------------------------------------
-# Vercel handler
+# Flask app — Vercel uses this as the WSGI entrypoint
 # ---------------------------------------------------------------------------
-def handler(request):
-    cors_headers = {
-        "Access-Control-Allow-Origin":  "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-    }
+from flask import Flask, request as flask_request, jsonify
 
-    # Serve the HTML page on GET
-    if request.method == "GET":
-        import pathlib
-        html_path = pathlib.Path(__file__).parent.parent / "public" / "index.html"
-        html = html_path.read_text(encoding="utf-8")
-        return (html, 200, {"Content-Type": "text/html; charset=utf-8"})
+app = Flask(__name__)
 
-    if request.method == "OPTIONS":
-        return ("", 204, cors_headers)
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_html(path):
+    import pathlib
+    base = pathlib.Path(__file__).parent.parent
+    for candidate in ["public/index.html", "index.html"]:
+        html_path = base / candidate
+        if html_path.exists():
+            return html_path.read_text(encoding="utf-8"), 200, {"Content-Type": "text/html; charset=utf-8"}
+    return "Not found", 404
 
-    # POST — run the agent
-    cors_headers["Content-Type"] = "application/json"
+@app.route("/api/chat", methods=["POST", "OPTIONS"])
+def chat():
+    if flask_request.method == "OPTIONS":
+        return "", 204, {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+        }
 
-    try:
-        body = request.json if hasattr(request, "json") else json.loads(request.body)
-        if callable(body):
-            body = body()
-    except Exception:
-        return (json.dumps({"error": "Invalid JSON."}), 400, cors_headers)
+    body = flask_request.get_json(silent=True) or {}
 
     try:
         message, session_id = _validate_input(body)
     except ValueError as e:
-        return (json.dumps({"error": str(e)}), 400, cors_headers)
+        return jsonify({"error": str(e)}), 400
 
-    client_ip = (
-        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-        or "unknown"
-    )
+    client_ip = flask_request.headers.get("x-forwarded-for", "127.0.0.1").split(",")[0].strip()
     allowed, remaining = _check_rate_limit(client_ip)
     if not allowed:
-        return (json.dumps({
-            "error": f"Rate limit exceeded. {MAX_REQUESTS_PER_DAY} messages per day.",
-            "retry_after": "tomorrow",
-        }), 429, cors_headers)
+        return jsonify({"error": f"Rate limit exceeded. {MAX_REQUESTS_PER_DAY}/day.", "retry_after": "tomorrow"}), 429
 
     if not ANTHROPIC_API_KEY:
-        return (json.dumps({"error": "Service not configured."}), 503, cors_headers)
+        return jsonify({"error": "Service not configured."}), 503
 
     try:
         response_text, notion_url = _run_agent(message)
     except Exception:
-        return (json.dumps({"error": "Internal server error."}), 500, cors_headers)
+        return jsonify({"error": "Internal server error."}), 500
 
-    return (json.dumps({
-        "response":   response_text,
-        "notion_url": notion_url,
-        "remaining":  remaining,
-    }), 200, cors_headers)
+    return jsonify({"response": response_text, "notion_url": notion_url, "remaining": remaining})
+
+# Vercel WSGI entrypoint
+handler = app
