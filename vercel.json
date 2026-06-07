@@ -1,11 +1,6 @@
 {
   "version": 2,
   "outputDirectory": "public",
-  "functions": {
-    "api/chat.py": {
-      "runtime": "vercel-python@4.x"
-    }
-  },
   "routes": [
     {
       "src": "/api/chat",
