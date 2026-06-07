@@ -351,13 +351,22 @@ app = Flask(__name__)
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def serve_html(path):
+    # Avoid intercepting API calls
+    if path.startswith("api/"):
+        return jsonify({"error": "Not found"}), 404
+    
     import pathlib
-    base = pathlib.Path(__file__).parent.parent
-    for candidate in ["public/index.html", "index.html"]:
-        html_path = base / candidate
-        if html_path.exists():
-            return html_path.read_text(encoding="utf-8"), 200, {"Content-Type": "text/html; charset=utf-8"}
-    return "Not found", 404
+    search_paths = [
+        pathlib.Path(__file__).parent.parent / "public" / "index.html",
+        pathlib.Path("/var/task/public/index.html"),
+        pathlib.Path("/var/task/index.html"),
+    ]
+    for p in search_paths:
+        if p.exists():
+            return p.read_text(encoding="utf-8"), 200, {"Content-Type": "text/html; charset=utf-8"}
+    
+    paths_tried = [str(p) for p in search_paths]
+    return f"Not found. Tried: {paths_tried}", 404, {"Content-Type": "text/plain"}
 
 @app.route("/api/chat", methods=["POST", "OPTIONS"])
 def chat():
