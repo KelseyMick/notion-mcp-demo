@@ -84,4 +84,4 @@ def chat():
 if __name__ == '__main__':
     print("Notion MCP demo running at http://localhost:5000")
     print("Press Ctrl+C to stop.\n")
-    app.run(port=5000, debug=True)
+    app.run(port=5000, debug=False)
