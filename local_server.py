@@ -21,7 +21,7 @@ from flask import Flask, request, jsonify, send_from_directory
 # Import the core logic from chat.py
 from api.chat import _validate_input, _run_agent, MAX_REQUESTS_PER_DAY
 
-app = Flask(__name__, static_folder='.')
+app = Flask(__name__, static_folder='public')
 
 # Simple in-memory rate limiter for local use
 from collections import defaultdict
@@ -41,7 +41,7 @@ def _local_rate_check(ip: str):
 
 @app.route('/')
 def index():
-    return send_from_directory('.', 'index.html')
+    return send_from_directory('public', 'index.html')
 
 
 @app.route('/api/chat', methods=['POST', 'OPTIONS'])
