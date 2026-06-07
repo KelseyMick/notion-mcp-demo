@@ -19,7 +19,7 @@ load_dotenv()
 from flask import Flask, request, jsonify, send_from_directory
 
 # Import the core logic from chat.py
-from chat import _validate_input, _run_agent, MAX_REQUESTS_PER_DAY
+from chat import _validate, _run_agent, MAX_REQUESTS_PER_DAY
 
 app = Flask(__name__, static_folder='public')
 
@@ -52,7 +52,7 @@ def chat():
     body = request.get_json(silent=True) or {}
 
     try:
-        message, session_id = _validate_input(body)
+        message, session_id = _validate(body)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
