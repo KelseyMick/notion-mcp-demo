@@ -19,7 +19,7 @@ load_dotenv()
 from flask import Flask, request, jsonify, send_from_directory
 
 # Import the core logic from chat.py
-from chat import _validate_input, _run_agent, MAX_REQUESTS_PER_DAY
+from api.chat import _validate_input, _run_agent, MAX_REQUESTS_PER_DAY
 
 app = Flask(__name__, static_folder='.')
 
