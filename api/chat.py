@@ -520,7 +520,7 @@ textarea:focus { border-color: var(--accent-dim); }
     </div>
     <p class="header-sub">
       Claude + MCP → Notion. Type a command, watch it appear in the
-      <a href="NOTION_PUBLIC_URL" target="_blank" id="notion-workspace-link">public workspace ↗</a>
+      <a href="https://linen-pewter-aa7.notion.site/378262e1a920801a9d3ee6f616bcd17b?v=378262e1a92080d2a7c4000c6c4d5e7a" target="_blank" id="notion-workspace-link">public workspace ↗</a>
     </p>
   </header>
 
