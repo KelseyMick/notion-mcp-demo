@@ -3,7 +3,7 @@
 A live demo of MCP (Model Context Protocol) in action. Talk to Claude in a
 web UI — it creates, finds, and deletes notes in a real public Notion workspace.
 
-**Live demo:** `https://your-app.vercel.app`  
+**Live demo:** `notion-mcp-demo.vercel.app`  
 **Public Notion:** `https://linen-pewter-aa7.notion.site/378262e1a920801a9d3ee6f616bcd17b?v=378262e1a92080d2a7c4000c6c4d5e7a`
 
 ---
