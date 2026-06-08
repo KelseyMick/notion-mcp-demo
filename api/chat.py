@@ -610,7 +610,7 @@ HTML = """<!doctype html>
               <button class="example" onclick="fillInput(this)">
                 <span class="example-icon">✏️</span>
                 <span
-                  >Create a note called "Project Ideas" with a list of startup
+                  >Create a note called "Project Ideas" with a list of project
                   ideas</span
                 >
               </button>
